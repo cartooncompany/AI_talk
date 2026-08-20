@@ -15,16 +15,25 @@ import { AGENTS, SPEEDS, createMatch } from './match-setup';
 
 export function SpectatorView() {
   const [speedIndex, setSpeedIndex] = useState(1);
-  /** 값이 바뀌면 새 게임이 만들어진다. '다시' 버튼이 이 값을 올린다. */
-  const [round, setRound] = useState(0);
 
-  const { scenario, engines } = useMemo(() => createMatch(round), [round]);
+  /**
+   * 게임을 만든 시점의 속도. 엔진의 '생각하는 시간'이 여기서 정해진다.
+   *
+   * 진행 중 속도 변경은 턴 사이 간격에만 반영하고 엔진은 그대로 둔다.
+   * 게임 도중 엔진을 바꾸면 진행하던 대화가 사라지기 때문이다.
+   */
+  const [round, setRound] = useState({ index: 0, speedIndex: 1 });
+  const { scenario, engines } = useMemo(
+    () => createMatch(round.index, round.speedIndex),
+    [round],
+  );
 
   const match = useMatch({
     scenario,
     agents: AGENTS,
     engines,
     turnDelay: SPEEDS[speedIndex].turnDelay,
+    matchKey: round.index,
   });
 
   // 턴·생각중 표시·승패 카드 중 무엇이 추가돼도 스크롤이 따라가야 한다.
@@ -43,7 +52,8 @@ export function SpectatorView() {
   const lastIndex = match.turns.length - 1;
 
   const restart = () => {
-    setRound((value) => value + 1);
+    // 새 게임은 현재 선택된 속도로 시작한다.
+    setRound((value) => ({ index: value.index + 1, speedIndex }));
   };
 
   return (

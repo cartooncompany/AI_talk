@@ -82,6 +82,14 @@ export function createConductor(options: ConductorOptions): Conductor {
   let currentIndex = 0;
   /** 루프가 이미 돌고 있는지. 중복 실행을 막는다. */
   let looping = false;
+  /**
+   * 게임 세대. reset()마다 올라간다.
+   *
+   * 엔진 호출은 await 지점을 갖는다. 그 사이에 reset이 일어나면 이미
+   * 버려진 게임의 응답이 돌아와 새 상태에 얹힐 수 있다. 세대를 비교해
+   * 낡은 결과를 버린다.
+   */
+  let epoch = 0;
 
   const listeners = new Set<(event: ConductorEvent) => void>();
 
@@ -108,6 +116,7 @@ export function createConductor(options: ConductorOptions): Conductor {
    * 발화하지 못한 것으로 처리해 게임이 멈추지 않게 한다.
    */
   const step = async (): Promise<boolean> => {
+    const startedAt = epoch;
     const agent = agents[currentIndex % agents.length];
     const engine = engines[agent.id];
     if (!engine) {
@@ -141,6 +150,9 @@ export function createConductor(options: ConductorOptions): Conductor {
       // 어느 쪽이 왜 실패했는지는 turn.reason에 남는다.
       void error;
     }
+
+    // 기다리는 사이에 reset이 일어났다면 이 응답은 버려진 게임의 것이다.
+    if (startedAt !== epoch) return true;
 
     const judgement = scenario.judge(text, turns);
     const turn: Turn = {
@@ -215,6 +227,8 @@ export function createConductor(options: ConductorOptions): Conductor {
     },
 
     reset() {
+      // 세대를 올려 진행 중인 턴의 결과가 새 게임에 얹히지 않게 한다.
+      epoch += 1;
       turns = [];
       currentIndex = 0;
       result = null;

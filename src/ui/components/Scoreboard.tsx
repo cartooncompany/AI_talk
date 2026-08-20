@@ -21,6 +21,9 @@ export function Scoreboard({ agents, activeId, winnerId, finished }: ScoreboardP
         const active = agent.id === activeId;
         const won = finished && agent.id === winnerId;
         const lost = finished && winnerId !== null && agent.id !== winnerId;
+        // 턴 제한으로 끝나면 승자가 없다. 이때 아무 표시도 없으면
+        // 게임이 아직 진행 중인 것처럼 보인다.
+        const drawn = finished && winnerId === null;
         return (
           <div key={agent.id} className="scoreboard__slot">
             {index === 1 && <span className="scoreboard__vs">VS</span>}
@@ -42,6 +45,7 @@ export function Scoreboard({ agents, activeId, winnerId, finished }: ScoreboardP
               <span className="player__status">
                 {won && '승리'}
                 {lost && '패배'}
+                {drawn && '무승부'}
                 {!finished && active && '생각 중'}
               </span>
             </div>

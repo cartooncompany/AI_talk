@@ -6,7 +6,7 @@
  * 접근성: 사용자가 동작 줄이기를 켜두었으면 즉시 전체를 보여준다.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
@@ -26,25 +26,42 @@ export function useTypewriter(
   options: TypewriterOptions = {},
 ): { shown: string; done: boolean } {
   const { speed = 55, enabled = true } = options;
-  const [shown, setShown] = useState('');
-  const reduced = useRef(prefersReducedMotion());
+  // 마운트 시점에 한 번만 읽는다. 렌더 중에도 안전하게 참조하기 위해
+  // ref가 아니라 state로 둔다.
+  const [reduced] = useState(prefersReducedMotion);
+
+  /**
+   * 보여줄 문자열과 완료 여부를 한 상태로 묶는다.
+   *
+   * done을 `shown.length >= text.length`로 유도하면, text가 짧은 값으로
+   * 바뀐 렌더에서 shown은 아직 이전(더 긴) 값이라 done이 잘못 true가 된다.
+   * 두 값이 항상 같은 시점을 가리키도록 함께 갱신한다.
+   */
+  const settle = enabled && !reduced && text.length > 0;
+  const [state, setState] = useState(() =>
+    settle ? { text, shown: '', done: false } : { text, shown: text, done: true },
+  );
 
   useEffect(() => {
-    if (!enabled || reduced.current || text.length === 0) {
-      setShown(text);
-      return;
-    }
+    // 애니메이션이 없는 경우엔 아무것도 하지 않는다. 렌더 중 파생이
+    // 이미 전체 문자열을 완료 상태로 돌려준다.
+    if (!settle) return;
 
-    setShown('');
     let index = 0;
     const timer = setInterval(() => {
       index += 1;
-      setShown(text.slice(0, index));
+      const slice = text.slice(0, index);
+      setState({ text, shown: slice, done: index >= text.length });
       if (index >= text.length) clearInterval(timer);
     }, speed);
 
     return () => clearInterval(timer);
-  }, [text, speed, enabled]);
+  }, [text, speed, settle]);
 
-  return { shown, done: shown.length >= text.length };
+  // text가 막 바뀐 렌더에서는 아직 이전 값이 담겨 있다. 그 한 프레임 동안
+  // 낡은 문자열을 완료된 것처럼 보이지 않게 한다.
+  if (state.text !== text) {
+    return settle ? { shown: '', done: false } : { shown: text, done: true };
+  }
+  return { shown: state.shown, done: state.done };
 }

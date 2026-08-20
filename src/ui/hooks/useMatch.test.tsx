@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { useMatch } from './useMatch';
 import { createScriptedEngine } from '../../core/engines/mock';
 import { createWordChain } from '../../core/scenarios/wordchain';
-import type { Agent } from '../../core/types';
+import type { Agent, Engine } from '../../core/types';
 
 const AGENTS: [Agent, Agent] = [
   { id: 'a', name: '에이', emoji: '🅰️', color: '#c96442' },
@@ -103,5 +103,76 @@ describe('useMatch', () => {
       result.current.start();
     });
     expect(() => unmount()).not.toThrow();
+  });
+
+  it('언마운트하면 턴 루프가 멈춘다', async () => {
+    // 회귀: 구독만 끊고 pause하지 않으면 아무도 보지 않는 게임이 계속
+    // 돌며 엔진을 호출한다. 측정해보니 300ms 동안 5회가 더 호출됐다.
+    // 실제 API 엔진에서는 그대로 네트워크 비용이 된다.
+    let calls = 0;
+    // 서로 이어지는 단어들. 규칙 위반으로 게임이 조기 종료되면
+    // 루프가 계속 도는지 확인할 수 없다.
+    const CHAIN = ['과자', '자연', '연필', '필통', '통조림', '림프'];
+    const countingEngine = (): Engine => ({
+      label: 'Counting',
+      generate: async () => {
+        const nth = calls;
+        calls += 1;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return { text: CHAIN[nth % CHAIN.length], thinkingTime: 0 };
+      },
+    });
+
+    const scenario = createWordChain({ openingWord: '사과', maxTurns: 50 });
+    const engines = { a: countingEngine(), b: countingEngine() };
+    const { result, unmount } = renderHook(() =>
+      useMatch({ scenario, agents: AGENTS, engines }),
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    // 첫 호출이 실제로 일어날 때까지 기다린다.
+    await waitFor(() => {
+      expect(calls).toBeGreaterThan(0);
+    });
+
+    unmount();
+    const atUnmount = calls;
+    // 루프가 살아 있으면 10ms짜리 턴이 이 시간 동안 여러 번 더 돈다.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    // 진행 중이던 턴 하나는 끝날 수 있지만 루프가 이어지면 안 된다.
+    expect(calls).toBeLessThanOrEqual(atUnmount + 1);
+  });
+
+  it('진행 중 reset하면 이전 게임의 턴이 새어 들어오지 않는다', async () => {
+    // 회귀: step()이 await에서 돌아온 뒤 세대 확인 없이 턴을 방출하면
+    // 리셋으로 비운 화면에 버려진 게임의 발화가 하나 얹힌다.
+    const slowEngine = (word: string): Engine => ({
+      label: 'Slow',
+      generate: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        return { text: word, thinkingTime: 0 };
+      },
+    });
+
+    const scenario = createWordChain({ openingWord: '사과', maxTurns: 50 });
+    const engines = { a: slowEngine('과자'), b: slowEngine('자연') };
+    const { result } = renderHook(() => useMatch({ scenario, agents: AGENTS, engines }));
+
+    act(() => {
+      result.current.start();
+    });
+    // 첫 턴이 아직 진행 중일 때 리셋한다.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    act(() => {
+      result.current.reset();
+    });
+    expect(result.current.turns).toHaveLength(0);
+
+    // 버려진 턴이 뒤늦게 도착하는지 확인한다.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(result.current.turns).toHaveLength(0);
+    expect(result.current.status).toBe('idle');
   });
 });
