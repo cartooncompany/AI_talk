@@ -1,0 +1,39 @@
+:root {
+  --bg: #0f1115;
+  --surface: #171a21;
+  --border: #262b36;
+  --text: #e6e8ec;
+  --text-dim: #9aa1ad;
+
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic',
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-shell {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+.app-shell p {
+  color: var(--text-dim);
+}
