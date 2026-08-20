@@ -10,7 +10,9 @@
     "dev": "node scripts/run.mjs vite",
     "build": "node scripts/run.mjs tsc -b && node scripts/run.mjs vite build",
     "lint": "oxlint",
-    "preview": "node scripts/run.mjs vite preview"
+    "preview": "node scripts/run.mjs vite preview",
+    "test": "node scripts/run.mjs vitest run",
+    "test:watch": "node scripts/run.mjs vitest"
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -23,6 +25,7 @@
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vitest": "^3.2.7"
   }
 }
