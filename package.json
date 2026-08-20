@@ -12,7 +12,8 @@
     "lint": "oxlint",
     "preview": "node scripts/run.mjs vite preview",
     "test": "node scripts/run.mjs vitest run",
-    "test:watch": "node scripts/run.mjs vitest"
+    "test:watch": "node scripts/run.mjs vitest",
+    "demo": "node scripts/run.mjs vite-node scripts/demo.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -26,6 +27,7 @@
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
+    "vite-node": "^6.0.0",
     "vitest": "^3.2.7"
   }
 }
