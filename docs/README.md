@@ -32,6 +32,8 @@ Git 브랜치·커밋·PR 규칙은 [workflow.md](workflow.md) 참고.
 ### 작업 로그
 - [01. 프로젝트 셋업](work/01-setup.md)
 - [02. 끝말잇기 규칙 엔진](work/02-wordchain-scenario.md)
+- [03. Mock 엔진 + Conductor](work/03-mock-engine-conductor.md)
 
 ### 이슈
 - [001. npm 스크립트에서 Node 버전이 가려지는 문제](issues/001-node-version-shadowing.md) — 해결됨
+- [002. 게임이 너무 빨리 끝나는 문제](issues/002-short-games.md) — 완화됨
