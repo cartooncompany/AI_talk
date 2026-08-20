@@ -39,8 +39,13 @@ export interface ConductorOptions {
   agents: [Agent, Agent];
   /** 에이전트 id → 엔진. 두 에이전트 모두에 대한 엔진이 있어야 한다. */
   engines: Record<string, Engine>;
-  /** 턴 사이에 추가로 쉬는 시간(ms). 관전 속도 조절용. 기본 0. */
-  turnDelay?: number;
+  /**
+   * 턴 사이에 추가로 쉬는 시간(ms). 관전 속도 조절용. 기본 0.
+   *
+   * 함수로 넘기면 매 턴 현재 값을 읽는다. 속도는 게임의 정체성이 아니라
+   * 재생 설정이므로, 진행 중에 바꿔도 게임이 이어져야 한다.
+   */
+  turnDelay?: number | (() => number);
 }
 
 export interface Conductor {
@@ -66,7 +71,10 @@ function sleep(ms: number): Promise<void> {
 
 export function createConductor(options: ConductorOptions): Conductor {
   const { scenario, agents, engines } = options;
-  const turnDelay = options.turnDelay ?? 0;
+  const readTurnDelay = (): number => {
+    const value = options.turnDelay ?? 0;
+    return typeof value === 'function' ? value() : value;
+  };
 
   let turns: Turn[] = [];
   let status: ConductorStatus = 'idle';
@@ -74,6 +82,14 @@ export function createConductor(options: ConductorOptions): Conductor {
   let currentIndex = 0;
   /** 루프가 이미 돌고 있는지. 중복 실행을 막는다. */
   let looping = false;
+  /**
+   * 게임 세대. reset()마다 올라간다.
+   *
+   * 엔진 호출은 await 지점을 갖는다. 그 사이에 reset이 일어나면 이미
+   * 버려진 게임의 응답이 돌아와 새 상태에 얹힐 수 있다. 세대를 비교해
+   * 낡은 결과를 버린다.
+   */
+  let epoch = 0;
 
   const listeners = new Set<(event: ConductorEvent) => void>();
 
@@ -100,6 +116,7 @@ export function createConductor(options: ConductorOptions): Conductor {
    * 발화하지 못한 것으로 처리해 게임이 멈추지 않게 한다.
    */
   const step = async (): Promise<boolean> => {
+    const startedAt = epoch;
     const agent = agents[currentIndex % agents.length];
     const engine = engines[agent.id];
     if (!engine) {
@@ -134,6 +151,9 @@ export function createConductor(options: ConductorOptions): Conductor {
       void error;
     }
 
+    // 기다리는 사이에 reset이 일어났다면 이 응답은 버려진 게임의 것이다.
+    if (startedAt !== epoch) return true;
+
     const judgement = scenario.judge(text, turns);
     const turn: Turn = {
       index: turns.length,
@@ -164,7 +184,8 @@ export function createConductor(options: ConductorOptions): Conductor {
       while (status === 'running') {
         const done = await step();
         if (done) break;
-        if (turnDelay > 0 && status === 'running') await sleep(turnDelay);
+        const delay = readTurnDelay();
+        if (delay > 0 && status === 'running') await sleep(delay);
       }
     } finally {
       looping = false;
@@ -206,6 +227,8 @@ export function createConductor(options: ConductorOptions): Conductor {
     },
 
     reset() {
+      // 세대를 올려 진행 중인 턴의 결과가 새 게임에 얹히지 않게 한다.
+      epoch += 1;
       turns = [];
       currentIndex = 0;
       result = null;

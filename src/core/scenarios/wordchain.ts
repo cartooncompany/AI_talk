@@ -7,6 +7,7 @@
 
 import { allowedStarts } from '../dueum';
 import { firstChar, isHangulWord, lastChar } from '../hangul';
+import { createRandom, type Random } from '../random';
 import type { Judgement, MatchResult, Scenario, Turn } from '../types';
 import { WORDS, WORD_SET } from '../../data/words';
 
@@ -31,14 +32,19 @@ function requiredStart(history: Turn[], openingWord: string): string {
   return lastChar(previous);
 }
 
-/** 사전에서 무작위로 시작 단어를 고른다. 이어갈 수 있는 단어를 우선한다. */
-function pickOpeningWord(): string {
+/**
+ * 사전에서 시작 단어를 고른다. 이어갈 수 있는 단어를 우선한다.
+ *
+ * 난수를 주입받는다. 시드를 고정하면 시작 단어까지 재현되어야 같은 시드가
+ * 같은 게임을 만든다.
+ */
+export function pickOpeningWord(random: Random = createRandom()): string {
   const starts = new Set(WORDS.map(firstChar));
   const openable = WORDS.filter((word) =>
     allowedStarts(lastChar(word)).some((char) => starts.has(char)),
   );
   const pool = openable.length > 0 ? openable : WORDS;
-  return pool[Math.floor(Math.random() * pool.length)];
+  return random.pick(pool) ?? pool[0];
 }
 
 export function createWordChain(options: WordChainOptions = {}): Scenario {
