@@ -39,8 +39,13 @@ export interface ConductorOptions {
   agents: [Agent, Agent];
   /** 에이전트 id → 엔진. 두 에이전트 모두에 대한 엔진이 있어야 한다. */
   engines: Record<string, Engine>;
-  /** 턴 사이에 추가로 쉬는 시간(ms). 관전 속도 조절용. 기본 0. */
-  turnDelay?: number;
+  /**
+   * 턴 사이에 추가로 쉬는 시간(ms). 관전 속도 조절용. 기본 0.
+   *
+   * 함수로 넘기면 매 턴 현재 값을 읽는다. 속도는 게임의 정체성이 아니라
+   * 재생 설정이므로, 진행 중에 바꿔도 게임이 이어져야 한다.
+   */
+  turnDelay?: number | (() => number);
 }
 
 export interface Conductor {
@@ -66,7 +71,10 @@ function sleep(ms: number): Promise<void> {
 
 export function createConductor(options: ConductorOptions): Conductor {
   const { scenario, agents, engines } = options;
-  const turnDelay = options.turnDelay ?? 0;
+  const readTurnDelay = (): number => {
+    const value = options.turnDelay ?? 0;
+    return typeof value === 'function' ? value() : value;
+  };
 
   let turns: Turn[] = [];
   let status: ConductorStatus = 'idle';
@@ -164,7 +172,8 @@ export function createConductor(options: ConductorOptions): Conductor {
       while (status === 'running') {
         const done = await step();
         if (done) break;
-        if (turnDelay > 0 && status === 'running') await sleep(turnDelay);
+        const delay = readTurnDelay();
+        if (delay > 0 && status === 'running') await sleep(delay);
       }
     } finally {
       looping = false;
